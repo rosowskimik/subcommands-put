@@ -1,0 +1,15 @@
+5,on,off,4,9
+2,five,follow,2,4
+2,five,off,1,3
+2,forward,follow,7,9
+2,forward,four,20,22
+2,four,follow,3,5
+2,no,go,7,9
+2,right,five,6,8
+2,three,right,2,4
+2,zero,two,3,5
+2,zero,visual,1,3
+1,backward,bird,0,1
+1,backward,dog,0,1
+1,bed,on,0,1
+1,bed,stop,1,2
