@@ -378,8 +378,8 @@ Rozmiar plików programu ExecuTorch (`.pte`) wynosił:
 - FP32: 130 580 bajtów,
 - INT8: 45 972 bajtów.
 
-Oznacza to zmniejszenie rozmiaru o ok. 64.8% (model INT8 jest ok. 2.84× mniejszy
-od FP32). Jest to istotne z punktu widzenia docelowego uruchamiania modelu w
+Oznacza to zmniejszenie rozmiaru o ok. 64.8% (model INT8 jest ok. 2.84x mniejszy od FP32).
+Jest to istotne z punktu widzenia docelowego uruchamiania modelu w
 aplikacji C++ oraz potencjalnego wdrażania na urządzeniach o ograniczonej
 pamięci.
 
@@ -420,6 +420,36 @@ zbliżonym do real-time (np. przesuwające się okno) jest jak najbardziej
 osiągalne na testowanej platformie: nawet dla kroku co 10 ms (100 inferencji/s)
 czas samej inferencji stanowi niewielką część dostępnego budżetu czasowego.
 
+= Problemy z Zephyrem i ExecuTorchem
+
+Pirwotnym założeniem projektu było uruchomienie skwantyzowanego modelu na
+płytce Arduino Nano 33 BLE Sense z systemem Zephyr i ExecuTorchem.
+Płytka posiada mikrofon PDM, co pasowało do docelowego scenariusza "embedded".
+Po wciśnięciu przycisku (GPIO) urządzenie miało nagrać 1 sekundę audio,
+przekształcić sygnał do spektogramu, wykonać inferencję i wypisać wynik
+na uarcie. Przetwarzanie sygnału miało być zaimplementowane z pomocą biblioteki
+`cmsis-dsp`, co dało by znacznie lepsze rezultaty niż surowe C/C++ z powodu
+wykorzystania akceleracji sprzętowej / operacji wektorowych. Dodatkowo
+niektóre stałe (np. `hann_window`) miały być wyeksportowane z PyTorcha,
+co też przyśpieszyło by ten proces.
+
+W praktyce wsparcie ExecuTorcha na Zephyrze okazało się być bardzo esperymentalne
+i w testowej konfiguracji nie udało się doprowadzić do poprawnej budowy aplikacji.
+Próby były wykonywane na ExecuTorchu w wersji `a577584f927fe082256e4b8be7e2b9ada27c10f4`.
+
+Napotkane problemy to m.in:
+
+- brak dobrej dokumentacji: jedyny dowód, że takie coś jest w ogóle możliwe
+  to przykład arm z ExecuTorch'a, który nie buduje się out-of-the-box
+- problem z symlinkami: symlinki w `executorch/src` powodowały błędy;
+  obejściem było ręczne ich zastąpienie hard linkami.
+- problemy z backendem arm (głównie TOSA)
+- problemy z vendorowanymi zależnościami, np. próby linkowania dynamicznego
+  ze strony build systemu
+
+W ostateczności plan uruchomienia na płytce wraz z Zephyrem został odłożony
+z powodu braku czasu.
+
 = Wnioski
 
 - *Skuteczność (accuracy):* kwantyzacja spowodowała jedynie minimalny spadek
@@ -427,24 +457,24 @@ czas samej inferencji stanowi niewielką część dostępnego budżetu czasowego
   tj. różnica ok. \(-0.29\) pp. Jednocześnie wpływ kwantyzacji nie był
   równomierny dla wszystkich klas: dla części etykiet zanotowano niewielkie
   spadki (np. `zero`, `forward`, `visual`), ale dla innych pojawiły się
-  poprawy (np. `go`, `sheila`, `off`, `eight`). Oznacza to, że INT8 nie jest
-  “gorszy wszędzie”, lecz zmienia rozkład błędów.
+  poprawy (np. `go`, `sheila`, `off`, `eight`). Oznacza to, że INT8 nie jest "gorszy wszędzie",
+  lecz zmienia rozkład błędów.
 - *Charakter błędów:* analiza macierzy pomyłek pokazała, że najczęstsze pomyłki
-  obu modeli są bardzo podobne (np. `forward → four`, `off → up`, `tree → three`).
+  obu modeli są bardzo podobne (np. `forward -> four`, `off -> up`, `tree -> three`).
   Różnice dotyczą głównie liczności wybranych par błędów. Przykładowo,
-  po kwantyzacji wzrosła liczba pomyłek `on → off` (z 4 do 9). Takie przypadki
-  są dobrym kandydatem do dalszej analizy (np. sprawdzenia, czy próbki są
-  akustycznie podobne albo czy problem wynika z cech wejściowych).
+  po kwantyzacji wzrosła liczba pomyłek `on -> off` (z 4 do 9).
+  Takie przypadki są dobrym kandydatem do dalszej analizy (np. sprawdzenia,
+  czy próbki są akustycznie podobne albo czy problem wynika z cech wejściowych).
 - *Rozmiar modelu:* największą korzyścią kwantyzacji okazała się redukcja
-  rozmiaru modelu `.pte`: 130 580 B (FP32) → 45 972 B (INT8), czyli ok. 64.78%
+  rozmiaru modelu `.pte`: 130 580 B (FP32) -> 45 972 B (INT8), czyli ok. 64.78%
   mniej (około 2.84×). Jest to istotne z punktu widzenia wdrożeń na urządzeniach
   o ograniczonej pamięci oraz dystrybucji modeli.
 - *Możliwość przetwarzania w czasie rzeczywistym:* przy czasie inferencji rzędu
   ~0.217 ms na pojedyncze uruchomienie modelu, przetwarzanie z przesuwającym się
   oknem jest realne (np. przy kroku co 10 ms jest to ok. 100 inferencji/s, co
   nadal zostawia duży budżet czasowy). Należy jednak pamiętać, że w praktycznej
-  aplikacji istotny koszt może stanowić także przygotowanie cech (Mel-spektrogram)
-  oraz obsługa buforowania i wejścia audio.
+  aplikacji istotniejszy koszt najpewniej stanowić będzie przygotowanie cech
+  (Mel-spektrogram) oraz obsługa buforowania i wejścia audio.
 
 Podsumowując: kwantyzacja INT8 w badanym przypadku dała bardzo dużą redukcję
 rozmiaru modelu przy niemal niezmienionej skuteczności, natomiast nie przyniosła
